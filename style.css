@@ -19,12 +19,12 @@ body {
     position: absolute;
     top: 2px;
     right: 10px;
-    display: none;
-    background: #fff url("https://img.icons8.com/material-outlined/24/fa314a/delete-sign.png") no-repeat center center;
     width: 26px;
     height: 26px;
     border: none;
-
+    background: #fff;
+    color: red;
+    font-size: 20px;
 }
 .total_results{
     margin: auto;
@@ -200,4 +200,7 @@ body {
         .header > span {
         font-size: 18px;
         }
-        
+
+        .hidden{
+            display: none;
+        }
