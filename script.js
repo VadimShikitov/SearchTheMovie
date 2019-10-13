@@ -1,10 +1,11 @@
 const apiKey = '1977b733';
 const baseUrl = `https://www.omdbapi.com/?apiKey=${apiKey}`;
 let timer;
-let page;
 let currentResult;
 let currentTitle;
 let clearSearchLine;
+let pagesInMemory = {};
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('searchFilm').addEventListener("input", searchMovie);
     clearSearchLine = document.getElementById("clear");
@@ -23,24 +24,26 @@ function searchMovie(event) {
     }
     if (searchAny.length) {
         timer = setTimeout(function () {
-            if (document.getElementById("viewFilms")) {
-                document.getElementById("viewFilms").remove();
-            }
-            doSomething(searchAny);
+            document.querySelectorAll(".viewFilms").forEach(e => {
+                e.remove();
+            })
+            document.getElementById("pages").innerHTML = "";
+            pagesInMemory = {};
+            requestFilms(searchAny);
         }, 1000);
     }
 }
 
 //Function for server request
-function doSomething(searchString) {
-       /*  this block of code removes spaces replacing them with a plus */
+function requestFilms(searchString, currentPage) {
+  
+    /*  this block of code removes spaces replacing them with a plus */
     let filmName = searchString.split(" ");
     filmName = searchString.toLowerCase().trim().replace(/\s+/g, "+");
-    console.log(filmName);
     currentTitle = filmName;
     let pageParam = "";
-    if (page) {
-        pageParam = `&page=${page}`;
+    if (currentPage) {
+        pageParam = `&page=${currentPage}`;
     }
     let url = `https://www.omdbapi.com/?apiKey=${apiKey}&s=${filmName}&${pageParam}`;
     if (filmName.length < 3) {
@@ -51,7 +54,7 @@ function doSomething(searchString) {
     fetch(url)
         .then(request => request.json())
         .then(json => {
-            responseBodyProcessing(json);
+            processBodyResponse(json, currentPage);
         })
 }
 // Function to show Button
@@ -68,17 +71,17 @@ function clearSeach() {
     hideButton();
 }
 // Function for view films
-function view(obj) {
+function view(filmInfo, viewFilms) {
     let block = document.createElement("div");
     block.className = "anyFilm";
-    block.id = obj.imdbID;
+    block.id = filmInfo.imdbID;
     let blockDiv = document.createElement("div");
     blockDiv.className = "title";
     let spanTitle = document.createElement("span");
-    spanTitle.innerHTML = obj.Title;
+    spanTitle.innerHTML = filmInfo.Title;
     let spanYear = document.createElement("span");
     spanYear.className = "year";
-    spanYear.innerHTML = obj.Year;
+    spanYear.innerHTML = filmInfo.Year;
     let newBlock = document.createElement("div");
     newBlock.className = "readMore";
     let spanText = document.createElement("span");
@@ -86,6 +89,7 @@ function view(obj) {
     let button = document.createElement("button");
     button.className = "read";
     button.innerHTML = "read more";
+    button.dataset.filmId = filmInfo.imdbID;
     button.onclick = requestId;
     block.appendChild(blockDiv);
     block.appendChild(newBlock);
@@ -93,86 +97,49 @@ function view(obj) {
     blockDiv.appendChild(spanYear);
     newBlock.appendChild(spanText);
     newBlock.appendChild(button);
-    document.getElementById("viewFilms").appendChild(block);
+    viewFilms.appendChild(block);
 }
 
 // Function for display search results
-function totalResults(length, results) {
-    let div = document.createElement("div");
-    div.className = "total_results";
-    div.id = "total_results";
-    let span = document.createElement("span");
-    span.innerHTML = length + " of " + results + " are shown";
-    div.appendChild(span);
-    document.body.appendChild(div);
+function displayTotalResults(length, results) {
+    let stringResults = length + " of " + results + " are shown";
+    document.getElementById("total_results").innerHTML = stringResults;
+    return stringResults;
 }
 //Function for view all information about film after click on button "read more"
-function viewInfoAboutFilm(obj) {
-    while (document.body.firstChild) {
-        document.body.firstChild.remove();
-    }
-    let header = document.createElement("div");
-    header.className = "header";
-    document.body.appendChild(header);
-    let home = document.createElement("a");
-    home.innerHTML = "Home";
-    home.onclick = backToMovieList;
-    header.appendChild(home);
-    let category = document.createElement("span");
-    category.innerHTML = ` / ${obj.Type}`;
-    header.appendChild(category);
-    let film = document.createElement("div");
-    film.className = "film";
-    let poster = document.createElement("div");
-    poster.className = "poster";
-    let image = document.createElement("img");
-    image.className = "image";
-    image.setAttribute('src', obj.Poster);
-    let aboutFilm = document.createElement("div");
-    aboutFilm.className = "about_film";
-    let rate = document.createElement("span");
-    rate.className = "rate";
-    rate.innerHTML = obj.imdbRating;
-    let name = document.createElement("span");
-    name.className = "name";
-    name.innerHTML = obj.Title;
-    let yearFilm = document.createElement("span");
-    yearFilm.className = "year_film";
-    yearFilm.innerHTML = obj.Year;
-    let genre = document.createElement("span");
-    genre.className = "genre";
-    genre.innerHTML = obj.Genre;
-    let actors = document.createElement("div");
-    actors.className = "actors";
-    let mainActors = obj.Actors.split(",");
-    for (i = 0; i < mainActors.length; i++) {
-        let actor = document.createElement("span");
-        actor.className = "actor";
-        actor.innerHTML = mainActors[i].trim();
-        actors.appendChild(actor);
-    }
-    let shortDescription = document.createElement("span");
-    shortDescription.className = "short_description";
-    shortDescription.innerHTML = obj.Plot;
-    aboutFilm.appendChild(rate);
-    aboutFilm.appendChild(name);
-    aboutFilm.appendChild(yearFilm);
-    aboutFilm.appendChild(genre);
-    aboutFilm.appendChild(actors);
-    aboutFilm.appendChild(shortDescription);
-    poster.appendChild(image);
-    film.appendChild(poster);
-    film.appendChild(aboutFilm);
-    document.body.appendChild(film);
+function viewInfoAboutFilm(filmInfo) {
+    document.getElementById("main").classList.add("hidden");
+
+
+    document.getElementById("film").classList.remove("hidden");
+    document.getElementById("type").innerHTML = "/ " + filmInfo.Type;
+    document.querySelector(".image").setAttribute('src', filmInfo.Poster);
+    document.querySelector(".rate").innerHTML = filmInfo.imdbRating;
+    document.querySelector(".name").innerHTML = filmInfo.Title;
+    document.querySelector(".year_film").innerHTML = filmInfo.Year;
+    document.querySelector(".genre").innerHTML = filmInfo.Genre;
+    let actors = document.querySelector(".actors");
+    actors.querySelectorAll(".actor").forEach(e => {
+        e.remove();
+    })
+    let mainActors = filmInfo.Actors.split(",");
+    mainActors.forEach(actor => {
+        const spanElement = document.createElement("span");
+        spanElement.className = "actor";
+        spanElement.innerHTML = actor.trim();
+        actors.appendChild(spanElement);
+    });
+    document.querySelector(".short_description").innerHTML = filmInfo.Plot;
 }
-//Function for request to server by ID
+//Function for request to server by ID  
 function requestId() {
-    let id = this.parentNode.parentNode.id;
+    let id = this.dataset.filmId;
     let url = `https://www.omdbapi.com/?apiKey=${apiKey}&i=${id}`;
     fetch(url)
         .then(request => request.json())
         .then(viewInfoAboutFilm)
 }
+
 function createPagination(page, block, pages) {
     let otherpages = 4; //количество доступных страниц, за исключением первой и последней страницы
     // let end, begin;		
@@ -180,6 +147,7 @@ function createPagination(page, block, pages) {
         let a = document.createElement("a");
         a.innerHTML = "1";
         a.onclick = newPageMovie;
+        a.dataset.page = 1;
         let li = document.createElement("li");
         li.appendChild(a);
         block.appendChild(li);
@@ -194,12 +162,14 @@ function createPagination(page, block, pages) {
     }
     let pagebeg = page - 2;
 
-    if (pagebeg > Math.floor(otherpages / 2))
+    if (pagebeg > Math.floor(otherpages / 2)) {
         pagebeg = Math.floor(otherpages / 2);
+    }
 
     let pageend = pages - page - 1;
-    if (pageend > Math.floor(otherpages / 2))
+    if (pageend > Math.floor(otherpages / 2)) {
         pageend = Math.floor(otherpages / 2);
+    }
 
     if (pagebeg > pageend) {
         pagebeg += otherpages - pagebeg - pageend;
@@ -208,12 +178,14 @@ function createPagination(page, block, pages) {
     }
 
     pagebeg = page - pagebeg;
-    if (pagebeg < 2)
+    if (pagebeg < 2) {
         pagebeg = 2;
+    }
 
     pageend = page + pageend;
-    if (pageend >= pages)
+    if (pageend >= pages) {
         pageend = pages - 1;
+    }
 
     if (pagebeg > 2) {
         let span = document.createElement("span");
@@ -230,6 +202,7 @@ function createPagination(page, block, pages) {
         // console.log(a);
         a.innerHTML = i;
         a.onclick = newPageMovie;
+        a.dataset.page = i;
         let li = document.createElement("li");
         li.appendChild(a);
         block.appendChild(li);
@@ -248,6 +221,7 @@ function createPagination(page, block, pages) {
         let a = document.createElement("a");
         a.innerHTML = i;
         a.onclick = newPageMovie;
+        a.dataset.page = i;
         let li = document.createElement("li");
         li.appendChild(a);
         block.appendChild(li);
@@ -266,6 +240,7 @@ function createPagination(page, block, pages) {
         let a = document.createElement("a");
         a.innerHTML = pages;
         a.onclick = newPageMovie;
+        a.dataset.page = pages;
         let li = document.createElement("li");
         li.appendChild(a);
         block.appendChild(li);
@@ -274,78 +249,69 @@ function createPagination(page, block, pages) {
 }
 //function for switch pages
 function newPageMovie() {
-    page = parseInt(this.innerHTML);
-    if (page == 1 || !page)
+    let page = parseInt(this.dataset.page);
+    if (page == 1 || !page){
         page = "";
-    searchMovie();
-}
-function backToMovieList() {
-    backPage();
-    showButton();
-    responseBodyProcessing(currentResult);
-}
-//Function for create input
-function backPage() {
-    while (document.body.firstChild) document.body.firstChild.remove();
-    let div = document.createElement("div");
-    div.className = "search";
-    let input = document.createElement("input");
-    input.value = currentTitle;
-    input.className = "searchFilm";
-    input.type = "text";
-    input.id = "searchFilm";
-    input.placeholder = "Enter movie title";
-    let button = document.createElement("button");
-    button.className = "clear";
-    button.onclick = clearSeach;
-    document.body.appendChild(div);
-    div.appendChild(input);
-    div.appendChild(button);
+    }
+    document.querySelectorAll(".viewFilms").forEach(e => {
+        e.classList.add("hidden");
+    })
+    document.getElementById("pages").querySelectorAll("ul").forEach(e => {
+        e.classList.add("hidden");
+    })
+    if(!pagesInMemory[page || 1]){
+        requestFilms(currentTitle, page);
+        return;
+    }
+    document.getElementById("total_results").innerHTML = pagesInMemory[page || 1];
+    document.getElementById(`viewFilms${page || 1}`).classList.remove("hidden");
+    document.getElementById(`pagination${page || 1}`).classList.remove("hidden");
 }
 
-function responseBodyProcessing(json){
+function goToPreviousPage() {
+    backPage();
+}
+
+function backPage() {
+    document.getElementById("film").classList.add("hidden");
+    document.getElementById("main").classList.remove("hidden");
+}
+
+function processBodyResponse(json, page) {
     console.log(json);
-    if (document.getElementById("total_results")) {
-        document.getElementById("total_results").remove();
+    if (json.Response == "False") {
+        return;
     }
-    if (json.Response != "False") {
-        let vrem = document.getElementById("pages");
-        if (vrem) {
-            vrem.remove();
+    currentResult = json;
+    if ("Search" in json) {
+        pagesInMemory[page || 1] = displayTotalResults(json.Search.length, json.totalResults);
+        let viewFilms = document.createElement("div");
+        viewFilms.className = "viewFilms";
+        viewFilms.id = `viewFilms${page || 1}`;
+        document.getElementById("forFilms").appendChild(viewFilms);
+        let tempPages = document.getElementById("pages");
+        let ul = document.createElement("ul");
+        ul.id = `pagination${page || 1}`;
+        tempPages.appendChild(ul);
+        createPagination(page || 1, ul, Math.ceil(json.totalResults / 10));
+        for (let i = 0; i < json.Search.length; i++) {
+            console.log(json.Search[i]);
+            view(json.Search[i], viewFilms);
         }
-        currentResult = json;
-        if ("Search" in json) {
-            totalResults(json.Search.length, json.totalResults);
-            let viewFilms = document.createElement("div");
-            viewFilms.className = "viewFilms";
-            viewFilms.id = "viewFilms";
-            document.body.appendChild(viewFilms);
-            let vrem = document.createElement("div");
-            vrem.className = "pagination";
-            vrem.id = "pages";
-            document.body.appendChild(vrem);
-            let ul = document.createElement("ul");
-            vrem.appendChild(ul);
-            createPagination(page || 1, ul, Math.ceil(json.totalResults / 10));
-            for (let i = 0; i < json.Search.length; i++) {
-                console.log(json.Search[i]);
-                view(json.Search[i]);
-            }
-        } else {
-            totalResults(1, 1);
-            let viewFilms = document.createElement("div");
-            viewFilms.className = "viewFilms";
-            viewFilms.id = "viewFilms";
-            document.body.appendChild(viewFilms);
-            let vrem = document.createElement("div");
-            vrem.className = "pagination";
-            vrem.id = "pages";
-            document.body.appendChild(vrem);
-            let ul = document.createElement("ul");
-            vrem.appendChild(ul);
-            createPagination(page || 1, ul, 1);
-            view(json);
-        }
+    } else {
+        pagesInMemory[page || 1] = displayTotalResults(1, 1);
+        let viewFilms = document.createElement("div");
+        viewFilms.className = "viewFilms";
+        viewFilms.id = "viewFilms";
+        document.body.appendChild(viewFilms);
+        let tempPages = document.createElement("div");
+        tempPages.className = "pagination";
+        tempPages.id = "pages";
+        document.body.appendChild(tempPages);
+        let ul = document.createElement("ul");
+        tempPages.appendChild(ul);
+        createPagination(page || 1, ul, 1);
+        view(json, viewFilms);
     }
     page = "";
 }
